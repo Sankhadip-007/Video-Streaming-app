@@ -48,6 +48,7 @@ public class Player extends AppCompatActivity {
     StyledPlayerView playerView;
     ExoPlayer exoPlayer;
     ProgressBar pg;
+    SimpleCache simpleCache;
 
     int set=0;
     long starttime=0L,timemilli=0L,timeswap=0L,updatetime=0L;
@@ -121,13 +122,16 @@ public class Player extends AppCompatActivity {
         // simple cache
         LeastRecentlyUsedCacheEvictor lru=new LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024);
         StandaloneDatabaseProvider sdp=new StandaloneDatabaseProvider(getApplicationContext());
-        SimpleCache simpleCache=new SimpleCache(new File(getCacheDir(),"EXOPlayer"+v.getId()+"_"+v.getName()),lru,sdp);
+        if(simpleCache==null){
+            simpleCache=new SimpleCache(new File(getApplicationContext().getCacheDir(),"EXOPlayer"+v.getId()+"_"+v.getName()),lru,sdp);
+        }
+
         DefaultHttpDataSource.Factory dfh=new DefaultHttpDataSource.Factory().
                                           setAllowCrossProtocolRedirects(true);
         DefaultDataSource.Factory dff=new DefaultDataSource.Factory(getApplicationContext(),dfh);
 
         CacheDataSource.Factory cdf=new CacheDataSource.Factory().setCache(simpleCache).
-                                    setUpstreamDataSourceFactory(dfh).
+                                    setUpstreamDataSourceFactory(dff).
                                      setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
 
         exoPlayer=new ExoPlayer.Builder(this).
@@ -139,7 +143,7 @@ public class Player extends AppCompatActivity {
         MediaItem mediaItem=MediaItem.fromUri(videoUrl);
         ProgressiveMediaSource mediaSource= new ProgressiveMediaSource.Factory(cdf).
                                          createMediaSource(mediaItem);
-        exoPlayer.setMediaSource(mediaSource);
+        exoPlayer.setMediaSource(mediaSource,true);
         exoPlayer.prepare();
         exoPlayer.play();
         //
@@ -150,6 +154,7 @@ public class Player extends AppCompatActivity {
         if(item.getItemId() == android.R.id.home)
         {
             onBackPressed();
+            exoPlayer.stop();
         }
         return super.onOptionsItemSelected(item);
     }
