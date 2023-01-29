@@ -14,10 +14,12 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.MediaController;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.VideoView;
 
 import com.google.android.exoplayer2.ExoPlayer;
@@ -38,10 +40,23 @@ import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.util.Calendar;
+import java.util.Date;
 
 public class Player extends AppCompatActivity {
-
+    public static  String FILE_NAME;
+    String vname;
+    String Loading_time;
+    long st1,pt1;
+    TextView mEditText;
     Handler customerHandler=new Handler();
     LinearLayout container;
     TextView timer1,url_view;
@@ -61,15 +76,18 @@ public class Player extends AppCompatActivity {
             int min=secs/60;
             secs%=60;
             int milliseconds=(int)(updatetime%1000);
-            if(exoPlayer.isPlaying())
-            {
-                pg=findViewById(R.id.progressBar);
-                pg.setVisibility(View.GONE);
-                timer1.setText("Started Playng");
-                set=1;
-                customerHandler.removeCallbacks(updateTimeThread);
-                System.out.println("buffered Time = "+min+":"+secs+":"+milliseconds);
+            if(set==0)
+            {   pt1= Calendar.getInstance().getTimeInMillis();
+               long  diff=st1-pt1;
+                System.out.println("DDiff== "+diff);
+                Date currentTime = Calendar.getInstance().getTime();
+                Loading_time= String.valueOf(currentTime);
+                timer1.setText(min+":"+secs+":"+milliseconds);
+                Loading_time=Loading_time+" "+min+":"+secs+":"+milliseconds+"\n";
+                View view = null;
+                save(view);
 
+                return;
             }else
             {
                 if(set==1){timer1.setText("Buffering");
@@ -104,14 +122,14 @@ public class Player extends AppCompatActivity {
         TextView title = findViewById(R.id.videoTitle);
         title.setText(v.getName());
 
-
+        vname=v.getName();
         Uri videoUrl = Uri.parse(v.getVideoUrl());
         playerView=findViewById(R.id.exoPlayer);
 
          timer1=(TextView) findViewById(R.id.timer);
         starttime= SystemClock.uptimeMillis();
 
-       customerHandler.postDelayed(updateTimeThread,0);
+
 
        url_view=findViewById(R.id.url);
        url_view.setText(v.getVideoUrl());
@@ -146,7 +164,94 @@ public class Player extends AppCompatActivity {
         exoPlayer.setMediaSource(mediaSource,true);
         exoPlayer.prepare();
         exoPlayer.play();
-        //
+        customerHandler.postDelayed(updateTimeThread,0);
+        mEditText=findViewById(R.id.editText);
+        Button save1=findViewById(R.id.save);
+        Button load1=findViewById(R.id.load);
+        save1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view)
+            {
+                save(view);
+            }
+        });
+        load1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view)
+            {
+                load(view);
+            }
+        });
+    }
+    public void save(View v)
+    {
+        String text=Loading_time;
+        FILE_NAME=vname+".txt";
+        FileOutputStream fos=null;
+        try {
+            // fos = openFileOutput(FILE_NAME, MODE_PRIVATE);
+            fos = openFileOutput(FILE_NAME, MODE_APPEND);
+            OutputStreamWriter myOutWriter = new OutputStreamWriter(fos);
+            myOutWriter.append(text);
+            fos.write(text.getBytes());
+
+            Toast.makeText(this,"Saved to"+getFilesDir()+"/"+FILE_NAME,Toast.LENGTH_LONG).show();
+        }
+        catch (FileNotFoundException e)
+        {
+            e.printStackTrace();
+        }
+        catch(IOException e){
+            e.printStackTrace();
+        }finally {
+            if(fos!=null)
+            {
+                try{
+                    fos.close();
+                }
+                catch(IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    public  void load(View v)
+    {
+        FileInputStream fis=null;
+
+        try{
+            fis=openFileInput(FILE_NAME);
+            InputStreamReader isr=new InputStreamReader(fis);
+            BufferedReader br=new BufferedReader(isr);
+            StringBuilder sb=new StringBuilder();
+            String text;
+            while((text=br.readLine())!=null)
+            {
+                sb.append(text).append("\n");
+
+            }
+            mEditText.setText(sb.toString());
+
+        }catch(FileNotFoundException e)
+        {
+            e.printStackTrace();
+        }
+        catch(IOException e)
+        {
+            e.printStackTrace();
+        }finally {
+            if(fis!=null)
+            {
+                try{
+                    fis.close();
+                }catch(IOException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+
+        }
+
     }
 
     @Override
