@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.util.Log;
@@ -62,7 +63,7 @@ public class Player extends AppCompatActivity {
     TextView timer1,url_view;
     StyledPlayerView playerView;
     ExoPlayer exoPlayer;
-    ProgressBar pg;
+    //ProgressBar pg=findViewById(R.id.progressBar);
     SimpleCache simpleCache;
 
     int set=0;
@@ -102,7 +103,6 @@ public class Player extends AppCompatActivity {
         }
     };
     public static final String TAG = "TAG";
-    ProgressBar spinner;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -110,7 +110,6 @@ public class Player extends AppCompatActivity {
         setContentView(R.layout.activity_player);
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        spinner = findViewById(R.id.progressBar);
 
         Intent i = getIntent();
         Bundle data = i.getExtras();
@@ -141,7 +140,7 @@ public class Player extends AppCompatActivity {
         LeastRecentlyUsedCacheEvictor lru=new LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024);
         StandaloneDatabaseProvider sdp=new StandaloneDatabaseProvider(getApplicationContext());
         if(simpleCache==null){
-            simpleCache=new SimpleCache(new File(getApplicationContext().getCacheDir(),"EXOPlayer"+v.getId()+"_"+v.getName()),lru,sdp);
+            simpleCache=new SimpleCache(new File(Environment.getDataDirectory().getAbsolutePath(),"EXOPlayer"+v.getId()+"_"+v.getName()),lru,sdp);
         }
 
         DefaultHttpDataSource.Factory dfh=new DefaultHttpDataSource.Factory().
