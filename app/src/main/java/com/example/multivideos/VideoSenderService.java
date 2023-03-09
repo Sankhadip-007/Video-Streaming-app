@@ -28,8 +28,6 @@ public class VideoSenderService extends AppCompatActivity {
 
 
     public void startSendingVideo() {
-       // this.videoName = videoName;
-        // Get the video file from the video name
         videoFile = new File(getFilePathFromVideoName(videoName));
         // Start a new thread to listen for incoming connection requests
         new Thread(new Runnable() {

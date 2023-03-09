@@ -10,6 +10,8 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.net.nsd.NsdManager;
+import android.net.nsd.NsdServiceInfo;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pConfig;
@@ -49,11 +51,14 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
+import com.google.android.exoplayer2.upstream.FileDataSource;
 import com.google.android.exoplayer2.upstream.cache.Cache;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.upstream.cache.CacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
 import com.google.android.exoplayer2.upstream.cache.ContentMetadata;
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
+import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 
 import org.json.JSONException;
@@ -71,6 +76,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -94,6 +100,11 @@ public class Player extends AppCompatActivity {
     int set = 0;
     Uri videoUrl;
     BroadcastReceiver mReceiver;
+    Context context = this;
+    NsdManager nsdManager; NsdManager.DiscoveryListener discoveryListener;
+    NsdManager.ResolveListener resolveListener;
+    NsdManager nsdHelper;
+
     long starttime = 0L, timemilli = 0L, timeswap = 0L, updatetime = 0L, min, secs, milliseconds;
     Runnable updateTimeThread = new Runnable() {
         @Override
@@ -161,7 +172,7 @@ public class Player extends AppCompatActivity {
         Intent i = getIntent();
         Bundle data = i.getExtras();
         Video v = (Video) data.getSerializable("videoData");
-
+        String videoName="Exoplayer"+v.getId()+v.getName();
         getSupportActionBar().setTitle(v.getName());
         Log.d(TAG, "onCreate:");
 
@@ -178,21 +189,17 @@ public class Player extends AppCompatActivity {
 
         url_view = findViewById(R.id.url);
         url_view.setText(v.getVideoUrl());
-
-
         // exo player
-
         // simple cache
-        LeastRecentlyUsedCacheEvictor lru = new LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024);
-        StandaloneDatabaseProvider sdp = new StandaloneDatabaseProvider(getApplicationContext());
-        File file=new File(getCacheDir(),"EXOPlayer"+v.getId()+'_'+v.getName());
-        if (simpleCache == null) {
-            simpleCache = new SimpleCache(file, lru, sdp);
-        }
-        DefaultHttpDataSource.Factory dfh = new DefaultHttpDataSource.Factory().
-                setAllowCrossProtocolRedirects(true);
-        DefaultDataSource.Factory dff = new DefaultDataSource.Factory(getApplicationContext(), dfh);
 
+        CacheEvictor cacheEvictor = new LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024);
+        StandaloneDatabaseProvider sdp = new StandaloneDatabaseProvider(getApplicationContext());
+        File file = new File(context.getCacheDir(), "EXOPlayer" + v.getId() + '_' + v.getName());
+        if (simpleCache == null) {
+            simpleCache = new SimpleCache(file, cacheEvictor, sdp);
+        }
+        DefaultHttpDataSource.Factory dfh = new DefaultHttpDataSource.Factory().setAllowCrossProtocolRedirects(true);
+        DefaultDataSource.Factory dff = new DefaultDataSource.Factory(context, dfh);
         exoPlayer = new ExoPlayer.Builder(getApplicationContext()).build();
         playerView.setPlayer(exoPlayer);
 
@@ -220,20 +227,20 @@ public class Player extends AppCompatActivity {
                         public void onPeersAvailable(WifiP2pDeviceList peers) {
                             List<WifiP2pDevice> devices = new ArrayList<>(peers.getDeviceList());
                             System.out.println("devices " + devices.size());
-                            for (WifiP2pDevice device : devices){
-                                System.out.println("DeviceList: "+device.deviceName);
+                            for (WifiP2pDevice device : devices) {
+                                System.out.println("DeviceList: " + device.deviceName);
                             }
                             WifiP2pDevice closestDevice = null;
                             int closestRssi = Integer.MIN_VALUE;
                             for (WifiP2pDevice device : devices) {
                                 // find the closest device based on its signal strength (RSSI)
-                                if (device.deviceName != null  && device.deviceAddress != null) {
+                                if (device.deviceName != null && device.deviceAddress != null) {
                                     int rssi = device.deviceAddress.hashCode();
                                     if (rssi > closestRssi) {
                                         closestRssi = rssi;
                                         closestDevice = device;
                                     }
-                                    System.out.println("Closest devicee: "+closestDevice.deviceName);
+                                    System.out.println("Closest devicee: " + closestDevice.deviceName);
                                 }
                             }
 
@@ -241,27 +248,30 @@ public class Player extends AppCompatActivity {
                                 // connect to the closest device
                                 WifiP2pConfig config = new WifiP2pConfig();
                                 config.deviceAddress = closestDevice.deviceAddress;
+                                String addr = closestDevice.deviceAddress;
                                 wifiP2pManager.connect(channel, config, new WifiP2pManager.ActionListener() {
                                     @Override
                                     public void onSuccess() {// connection successful
                                         System.out.println("connection successful");
-                                        VideoReceiverService videoReceiverService = new VideoReceiverService();
-                                        videoReceiverService.startReceivingVideo(config.deviceAddress, 5000, v.getName());
+                                        VideoReceiverService videoReceiverService = new VideoReceiverService(addr, 5000, "EXOPlayer" + v.getId() + '_' + v.getName());
+                                        videoReceiverService.request();
+                                        videoReceiverService.startReceivingVideo();
+
                                         InputStream inputStream = videoReceiverService.getVideoInputStream();
 
-                                        DataSource.Factory dataSourceFactory = new InputStreamDataSourceFactory(inputStream);
-
-
+                                        //DataSource.Factory dataSourceFactory = new InputStreamDataSourceFactory(inputStream);
+                                        DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
                                         CacheDataSource.Factory cdf1 = new CacheDataSource.Factory().setCache(simpleCache).
                                                 setUpstreamDataSourceFactory(dataSourceFactory).
                                                 setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
                                         MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
-                                                .createMediaSource(MediaItem.fromUri(Uri.EMPTY));
-                                        exoPlayer = new ExoPlayer.Builder(getApplicationContext()).
-                                                setMediaSourceFactory(new DefaultMediaSourceFactory(cdf1)).build();
+                                                .createMediaSource(MediaItem.fromUri(Uri.fromFile(new File(context.getCacheDir(), videoName))));
+
+
+                                        exoPlayer = new ExoPlayer.Builder(context).setMediaSourceFactory(new DefaultMediaSourceFactory(cdf1)).build();
                                         exoPlayer.setMediaSource(mediaSource, true);
                                         exoPlayer.prepare();
-                                        Toast.makeText(getApplicationContext(), "Playing from nearby devices", Toast.LENGTH_SHORT).show();
+                                        Toast.makeText(context, "Playing from nearby devices", Toast.LENGTH_SHORT).show();
                                         exoPlayer.play();
                                     }
 
@@ -291,6 +301,8 @@ public class Player extends AppCompatActivity {
                 }
             });
         }
+
+
         mReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -299,7 +311,7 @@ public class Player extends AppCompatActivity {
                     // Check to see if WiFi is enabled and notify appropriate activity
                     int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
                     if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
-                        Toast.makeText(getApplicationContext(), "Wifi P2P enabled", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, "Wifi P2P enabled", Toast.LENGTH_SHORT).show();
                         //Wifi P2P is enabled
                     } else {
                         //Wifi P2P is not enabled
@@ -307,24 +319,11 @@ public class Player extends AppCompatActivity {
                     }
                 } else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
                     // Call WifiP2pManager.requestPeers() to get a list of current peers
-                    /*if (wifiP2pManager != null) {
-                        wifiP2pManager.requestPeers(channel, new WifiP2pManager.PeerListListener() {
-                            @Override
-                            public void onPeersAvailable(WifiP2pDeviceList peers) {
-                                List<WifiP2pDevice> devices = new ArrayList<>(peers.getDeviceList());
-                                System.out.println("list "+devices.size());
-                                //Process the list of available devices
-                            }
-                        });
-                    }*/
+
                 } else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
                     // Respond to new connection or disconnections
-                    if (wifiP2pManager == null) {
-                        return;
-                    }
                     NetworkInfo networkInfo = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
                     if (networkInfo.isConnected()) {
-
                         //We are connected with the other device, request connection info to find group owner IP
                         wifiP2pManager.requestConnectionInfo(channel, new WifiP2pManager.ConnectionInfoListener() {
                             @Override
@@ -398,6 +397,11 @@ public class Player extends AppCompatActivity {
                 com.google.android.exoplayer2.Player.Listener.super.onIsLoadingChanged(isLoading);
             }
         });
+
+        nsdManager.discoverServices(
+                "_video_tcp", NsdManager.PROTOCOL_DNS_SD, discoveryListener);
+
+
     }
 
 
@@ -495,7 +499,7 @@ public class Player extends AppCompatActivity {
         String date1 = String.valueOf(currentTime);
         String temp = vname + "       " + date1 + "      " + min + ":" + secs + ":" + milliseconds + "  " + cache;
 
-        String URL = "http://192.168.0.193:4001/video";
+        String URL = "http://192.168.54.200:4001/video";
         RequestQueue requestQueue = Volley.newRequestQueue(this);
         JSONObject json1 = new JSONObject();
         json1.put("tejas", temp);
@@ -504,33 +508,6 @@ public class Player extends AppCompatActivity {
             public void onResponse(JSONObject response) {
 
                 Log.d(TAG, "response=: " + response);
-//                try {
-
-
-//                    JSONArray videos =response.getJSONArray("videos");
-//
-//                    com.google.android.exoplayer2.util.Log.d(TAG,"changeResponse"+videos);
-//
-//                    for(int i = 0; i < videos.length() ; i++)
-//                    {
-//                        JSONObject video=videos.getJSONObject(i);
-//                        Video v = new Video();
-//                        v.setId(video.getString("id"));
-//                        v.setName(video.getString("name"));
-//                        String url="http://172.16.23.20:4000/video/";
-//                        url=url.concat(video.getString("id"));
-//
-//                        com.google.android.exoplayer2.util.Log.d(TAG, "url=: "+url);
-//
-//                        v.setVideoUrl(url);
-//
-//                        all_videos.add(v);
-//                        adapter.notifyDataSetChanged();
-//
-//                    }
-//                } catch (JSONException e) {
-//                    e.printStackTrace();
-//                }
             }
         }, new Response.ErrorListener() {
             @Override
