@@ -46,6 +46,7 @@ public class VideoReceiverService extends AppCompatActivity {
                     throw new RuntimeException(e);
                 }
 
+                //return 0;
             }
         });
 
@@ -76,6 +77,7 @@ public class VideoReceiverService extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                //return 0;
             }
         }).start();
 

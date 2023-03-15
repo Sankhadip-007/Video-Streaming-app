@@ -48,7 +48,7 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.ViewHolder> 
         public void onClick(View v) {
             Bundle b = new Bundle();
             b.putSerializable("videoData", allVideos.get(holder.getAdapterPosition()));
-            Intent i = new Intent(context, Player.class);
+            Intent i = new Intent(context, Player.class); //
             i.putExtras(b);
             v.getContext().startActivity(i);
         }

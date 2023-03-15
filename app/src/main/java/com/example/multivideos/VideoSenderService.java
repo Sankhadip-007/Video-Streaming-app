@@ -49,6 +49,7 @@ public class VideoSenderService extends AppCompatActivity {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                //return 0;
             }
         }).start();
     }
@@ -56,6 +57,6 @@ public class VideoSenderService extends AppCompatActivity {
     private String getFilePathFromVideoName(String videoName) {
         // Returns the file path for the video with the given name
         File appDir = new File(getApplicationContext().getCacheDir(),videoName);
-        return videoFile.getAbsolutePath();
+        return appDir.getAbsolutePath();
     }
 }

@@ -22,6 +22,7 @@ import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
 import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.SystemClock;
 import android.util.Log;
@@ -50,6 +51,7 @@ import com.google.android.exoplayer2.ui.StyledPlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
+import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.FileDataSource;
 import com.google.android.exoplayer2.upstream.cache.Cache;
@@ -91,19 +93,16 @@ public class Player extends AppCompatActivity {
     long st1, pt1;
     TextView mEditText;
     Handler customerHandler = new Handler();
-    LinearLayout container;
     TextView timer1, url_view;
     StyledPlayerView playerView;
     ExoPlayer exoPlayer;
-    SimpleCache simpleCache;
+    static SimpleCache simpleCache;
     long MybufferingTime = 0;
     int set = 0;
     Uri videoUrl;
     BroadcastReceiver mReceiver;
     Context context = this;
-    NsdManager nsdManager; NsdManager.DiscoveryListener discoveryListener;
-    NsdManager.ResolveListener resolveListener;
-    NsdManager nsdHelper;
+    NsdServer nsdServer;
 
     long starttime = 0L, timemilli = 0L, timeswap = 0L, updatetime = 0L, min, secs, milliseconds;
     Runnable updateTimeThread = new Runnable() {
@@ -140,7 +139,7 @@ public class Player extends AppCompatActivity {
                     e.printStackTrace();
                 }
 
-                return;
+                //return 0;
             } else {
                 if (set == 1) {
                     timer1.setText("Buffering");
@@ -152,6 +151,7 @@ public class Player extends AppCompatActivity {
             }
 
             customerHandler.postDelayed(this, 0);
+            //return 0;
         }
     };
     public static final String TAG = "TAG";
@@ -163,7 +163,6 @@ public class Player extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_player);
-
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         // spinner = findViewById(R.id.progressBar);
         final WifiP2pManager wifiP2pManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
@@ -172,7 +171,7 @@ public class Player extends AppCompatActivity {
         Intent i = getIntent();
         Bundle data = i.getExtras();
         Video v = (Video) data.getSerializable("videoData");
-        String videoName="Exoplayer"+v.getId()+v.getName();
+        String videoName = "Exoplayer" + v.getId() + v.getName();
         getSupportActionBar().setTitle(v.getName());
         Log.d(TAG, "onCreate:");
 
@@ -194,7 +193,7 @@ public class Player extends AppCompatActivity {
 
         CacheEvictor cacheEvictor = new LeastRecentlyUsedCacheEvictor(100 * 1024 * 1024);
         StandaloneDatabaseProvider sdp = new StandaloneDatabaseProvider(getApplicationContext());
-        File file = new File(context.getCacheDir(), "EXOPlayer" + v.getId() + '_' + v.getName());
+        File file = new File(context.getCacheDir(), videoName);
         if (simpleCache == null) {
             simpleCache = new SimpleCache(file, cacheEvictor, sdp);
         }
@@ -202,8 +201,8 @@ public class Player extends AppCompatActivity {
         DefaultDataSource.Factory dff = new DefaultDataSource.Factory(context, dfh);
         exoPlayer = new ExoPlayer.Builder(getApplicationContext()).build();
         playerView.setPlayer(exoPlayer);
-
         if (isVideoCached(videoUrl)) {
+
             CacheDataSource.Factory cdf = new CacheDataSource.Factory().setCache(simpleCache).
                     setUpstreamDataSourceFactory(dff).
                     setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
@@ -215,131 +214,35 @@ public class Player extends AppCompatActivity {
             exoPlayer.setMediaSource(mediaSource, true);
             exoPlayer.prepare();
             exoPlayer.play();
+            Toast.makeText(getApplicationContext(), "Playing from cache", Toast.LENGTH_SHORT).show();
+
+
         } else {
             System.out.println("Inside else");
-            wifiP2pManager.discoverPeers(channel, new WifiP2pManager.ActionListener() {
-
-                @Override
-                public void onSuccess() { // Connect to the closest device
-                    System.out.println("discoverPeers");
-                    wifiP2pManager.requestPeers(channel, new WifiP2pManager.PeerListListener() {
-                        @Override
-                        public void onPeersAvailable(WifiP2pDeviceList peers) {
-                            List<WifiP2pDevice> devices = new ArrayList<>(peers.getDeviceList());
-                            System.out.println("devices " + devices.size());
-                            for (WifiP2pDevice device : devices) {
-                                System.out.println("DeviceList: " + device.deviceName);
-                            }
-                            WifiP2pDevice closestDevice = null;
-                            int closestRssi = Integer.MIN_VALUE;
-                            for (WifiP2pDevice device : devices) {
-                                // find the closest device based on its signal strength (RSSI)
-                                if (device.deviceName != null && device.deviceAddress != null) {
-                                    int rssi = device.deviceAddress.hashCode();
-                                    if (rssi > closestRssi) {
-                                        closestRssi = rssi;
-                                        closestDevice = device;
-                                    }
-                                    System.out.println("Closest devicee: " + closestDevice.deviceName);
-                                }
-                            }
-
-                            if (closestDevice != null) {
-                                // connect to the closest device
-                                WifiP2pConfig config = new WifiP2pConfig();
-                                config.deviceAddress = closestDevice.deviceAddress;
-                                String addr = closestDevice.deviceAddress;
-                                wifiP2pManager.connect(channel, config, new WifiP2pManager.ActionListener() {
-                                    @Override
-                                    public void onSuccess() {// connection successful
-                                        System.out.println("connection successful");
-                                        VideoReceiverService videoReceiverService = new VideoReceiverService(addr, 5000, "EXOPlayer" + v.getId() + '_' + v.getName());
-                                        videoReceiverService.request();
-                                        videoReceiverService.startReceivingVideo();
-
-                                        InputStream inputStream = videoReceiverService.getVideoInputStream();
-
-                                        //DataSource.Factory dataSourceFactory = new InputStreamDataSourceFactory(inputStream);
-                                        DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
-                                        CacheDataSource.Factory cdf1 = new CacheDataSource.Factory().setCache(simpleCache).
-                                                setUpstreamDataSourceFactory(dataSourceFactory).
-                                                setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR);
-                                        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
-                                                .createMediaSource(MediaItem.fromUri(Uri.fromFile(new File(context.getCacheDir(), videoName))));
-
-
-                                        exoPlayer = new ExoPlayer.Builder(context).setMediaSourceFactory(new DefaultMediaSourceFactory(cdf1)).build();
-                                        exoPlayer.setMediaSource(mediaSource, true);
-                                        exoPlayer.prepare();
-                                        Toast.makeText(context, "Playing from nearby devices", Toast.LENGTH_SHORT).show();
-                                        exoPlayer.play();
-                                    }
-
-                                    @Override
-                                    public void onFailure(int reason) {
-                                        // connection failed
-                                        System.out.println("Connection rejected");
-
-                                    }
-                                });
-                            }
-                        }
-                    });
-                }
-
-                @Override
-                public void onFailure(int i) {
-                    // Handle failure -> go for server
-                    exoPlayer = new ExoPlayer.Builder(getApplicationContext()).build();
-                    playerView.setPlayer(exoPlayer);
-                    MediaItem mediaItem = MediaItem.fromUri(videoUrl);
-                    exoPlayer.setMediaItem(mediaItem);
-                    exoPlayer.prepare();
-                    Toast.makeText(getApplicationContext(), "Playing from server", Toast.LENGTH_SHORT).show();
-                    exoPlayer.play();
-
-                }
-            });
-        }
-
-
-        mReceiver = new BroadcastReceiver() {
-            @Override
-            public void onReceive(Context context, Intent intent) {
-                String action = intent.getAction();
-                if (WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION.equals(action)) {
-                    // Check to see if WiFi is enabled and notify appropriate activity
-                    int state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1);
-                    if (state == WifiP2pManager.WIFI_P2P_STATE_ENABLED) {
-                        Toast.makeText(context, "Wifi P2P enabled", Toast.LENGTH_SHORT).show();
-                        //Wifi P2P is enabled
-                    } else {
-                        //Wifi P2P is not enabled
-                        Toast.makeText(getApplicationContext(), "Wifi P2P NOT enabled", Toast.LENGTH_SHORT).show();
-                    }
-                } else if (WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION.equals(action)) {
-                    // Call WifiP2pManager.requestPeers() to get a list of current peers
-
-                } else if (WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION.equals(action)) {
-                    // Respond to new connection or disconnections
-                    NetworkInfo networkInfo = intent.getParcelableExtra(WifiP2pManager.EXTRA_NETWORK_INFO);
-                    if (networkInfo.isConnected()) {
-                        //We are connected with the other device, request connection info to find group owner IP
-                        wifiP2pManager.requestConnectionInfo(channel, new WifiP2pManager.ConnectionInfoListener() {
-                            @Override
-                            public void onConnectionInfoAvailable(WifiP2pInfo info) {
-                                //Initiate the video sender service to send the video
-                                Toast.makeText(getApplicationContext(), "Connection accepted " + info.toString(), Toast.LENGTH_SHORT).show();
-                                VideoSenderService videoSenderService = new VideoSenderService(v.getName());
-                                videoSenderService.startSendingVideo();
-                            }
-                        });
-                    }
-                } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
-                    // Respond to this device's wifi state changing
-                }
+            // Create a new instance of NsdServer and start the service
+            nsdServer = new NsdServer(this, videoName);
+            nsdServer.registerService(5500);
+            nsdServer.acceptConnections();
+            String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
+            File receivedFile = new File(path);
+            boolean exists = receivedFile.exists();
+            exoPlayer = new ExoPlayer.Builder(context).build();
+            playerView.setPlayer(exoPlayer);
+            if (exists) {
+                DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
+                MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                        .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
+                exoPlayer.setMediaSource(mediaSource);
+                exoPlayer.prepare();
+                Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
+            } else {
+                MediaItem mediaItem = MediaItem.fromUri(videoUrl);
+                exoPlayer.setMediaItem(mediaItem);
+                exoPlayer.prepare();
+                Toast.makeText(getApplicationContext(), "Playing from server", Toast.LENGTH_SHORT).show();
             }
-        };
+            exoPlayer.play();
+        }
 
 
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
@@ -359,6 +262,9 @@ public class Player extends AppCompatActivity {
             }
         }
 
+        NsdClient nsdClient = new NsdClient(this, videoName);
+        nsdClient.discoverServices();
+        nsdClient.resolveService();
 
         cache = isVideoCached(videoUrl);
         System.out.println("cache after= " + cache);
@@ -397,9 +303,6 @@ public class Player extends AppCompatActivity {
                 com.google.android.exoplayer2.Player.Listener.super.onIsLoadingChanged(isLoading);
             }
         });
-
-        nsdManager.discoverServices(
-                "_video_tcp", NsdManager.PROTOCOL_DNS_SD, discoveryListener);
 
 
     }
@@ -492,14 +395,13 @@ public class Player extends AppCompatActivity {
 
     }
 
-
     private void postJsonData() throws JSONException {
         System.out.println("{json calledddd..........}");
         Date currentTime = Calendar.getInstance().getTime();
         String date1 = String.valueOf(currentTime);
         String temp = vname + "       " + date1 + "      " + min + ":" + secs + ":" + milliseconds + "  " + cache;
 
-        String URL = "http://192.168.54.200:4001/video";
+        String URL = "http://192.168.0.193:4001/video";
         RequestQueue requestQueue = Volley.newRequestQueue(this);
         JSONObject json1 = new JSONObject();
         json1.put("tejas", temp);
@@ -537,6 +439,13 @@ public class Player extends AppCompatActivity {
         exoPlayer.setPlayWhenReady(true);
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        exoPlayer.release();
+        // Stop the service when the activity is destroyed
+        nsdServer.close();
+    }
 /*    @Override
     public  void onBackPresses()
     {
@@ -545,5 +454,4 @@ public class Player extends AppCompatActivity {
         release();
         finish();
     }*/
-
 }
