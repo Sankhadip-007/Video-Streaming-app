@@ -166,8 +166,6 @@ public class Player extends AppCompatActivity {
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         // spinner = findViewById(R.id.progressBar);
         final WifiP2pManager wifiP2pManager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
-        final WifiP2pManager.Channel channel = wifiP2pManager.initialize(this, getMainLooper(), null);
-
         Intent i = getIntent();
         Bundle data = i.getExtras();
         Video v = (Video) data.getSerializable("videoData");
@@ -221,7 +219,7 @@ public class Player extends AppCompatActivity {
             System.out.println("Inside else");
             // Create a new instance of NsdServer and start the service
             nsdServer = new NsdServer(this, videoName);
-            nsdServer.registerService(5500);
+            nsdServer.registerService(8888);
             nsdServer.acceptConnections();
             String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
             File receivedFile = new File(path);
@@ -234,7 +232,7 @@ public class Player extends AppCompatActivity {
                         .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
                 exoPlayer.setMediaSource(mediaSource);
                 exoPlayer.prepare();
-                Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
+                //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
             } else {
                 MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                 exoPlayer.setMediaItem(mediaItem);
@@ -245,8 +243,7 @@ public class Player extends AppCompatActivity {
         }
 
 
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-
+/*        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         if (wifiManager != null) {
             boolean success = wifiManager.startScan();
             if (success) {
@@ -260,7 +257,7 @@ public class Player extends AppCompatActivity {
             } else {
                 Log.e("Wi-Fi Scan Error", "Could not start scan");
             }
-        }
+        }*/
 
         NsdClient nsdClient = new NsdClient(this, videoName);
         nsdClient.discoverServices();
@@ -299,12 +296,9 @@ public class Player extends AppCompatActivity {
                     Log.d("Buffered Time", Long.toString(bufferedTime));
                     MybufferingTime = bufferedTime;
                 }
-
                 com.google.android.exoplayer2.Player.Listener.super.onIsLoadingChanged(isLoading);
             }
         });
-
-
     }
 
 
