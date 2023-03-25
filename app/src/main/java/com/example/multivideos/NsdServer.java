@@ -20,15 +20,17 @@ public class NsdServer extends AppCompatActivity {
     private static final String SERVICE_TYPE = "_http._tcp.";
     private static final String SERVICE_NAME = "multivideos";
     private static final String TAG = "NsdServer";
-    File outputFile;
+
     private NsdManager nsdManager;
     private NsdServiceInfo nsdServiceInfo;
     private ServerSocket serverSocket;
     private Socket clientSocket;
-    String videoName;
-    public NsdServer(Context context,String videoName) {
+
+    private String videoName;
+
+    public NsdServer(Context context, String videoName) {
         nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
-        this.videoName=videoName;
+        this.videoName = videoName;
     }
 
     public void registerService(int port) {
@@ -66,6 +68,7 @@ public class NsdServer extends AppCompatActivity {
             Log.e(TAG, "Error: " + e.getMessage());
         }
     }
+
     public void acceptConnections() {
         final int[] flag = {0};
         new Thread(new Runnable() {
@@ -75,9 +78,10 @@ public class NsdServer extends AppCompatActivity {
                     Log.d(TAG, "Waiting for incoming connections...");
                     clientSocket = serverSocket.accept();
                     Log.d(TAG, "Client connected: " + clientSocket.getInetAddress().getHostAddress());
-                    //Log.d(TAG, "Client connected: " + clientSocket.getInetAddress().getHostAddress());
                     InputStream inputStream = clientSocket.getInputStream();
-                    File outputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4");
+
+                    // Set the output file path
+                    File outputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), videoName);
                     OutputStream outputStream = new FileOutputStream(outputFile);
 
                     byte[] buffer = new byte[1024];
@@ -90,11 +94,10 @@ public class NsdServer extends AppCompatActivity {
                     inputStream.close();
                     outputStream.close();
                     clientSocket.close();
-                    Log.d(TAG, "video received: " + outputFile.getAbsolutePath());
+                    Log.d(TAG, "Video received: " + outputFile.getAbsolutePath());
                 } catch (IOException e) {
                     Log.e(TAG, "Error: " + e.getMessage());
                 }
-                //return 0;
             }
         }).start();
     }
@@ -107,7 +110,6 @@ public class NsdServer extends AppCompatActivity {
                 Log.e(TAG, "Error: " + e.getMessage());
             }
         }
-
         if (clientSocket != null) {
             try {
                 clientSocket.close();
@@ -116,29 +118,36 @@ public class NsdServer extends AppCompatActivity {
             }
         }
 
-      /*  if (nsdServiceInfo != null) {
-            Log.d(TAG, "inside close: " );
-            nsdManager.unregisterService(new NsdManager.RegistrationListener() {
-                @Override
-                public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-                    Log.d(TAG, "Service registered on close: " + serviceInfo.getServiceName());
-                }
-                @Override
-                public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                    Log.e(TAG, "Error code: " + errorCode);
-                }
-                @Override
-                public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
-                    Log.d(TAG, "Service unregistered: " + serviceInfo.getServiceName());
-                }
-                @Override
-                public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                    Log.e(TAG, "Error code: " + errorCode);
-                }
-            });
-        }*/
+        if (nsdServiceInfo != null) {
+            nsdManager.unregisterService(resolveListener);
+        }
+
     }
-    public File getFile(){
+    private NsdManager.RegistrationListener resolveListener = new NsdManager.RegistrationListener() {
+        @Override
+        public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+            Log.d(TAG, "Service registered: " + serviceInfo.getServiceName());
+        }
+
+        @Override
+        public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+            Log.e(TAG, "Error code: " + errorCode);
+        }
+
+        @Override
+        public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
+            Log.d(TAG, "Service unregistered: " + serviceInfo.getServiceName());
+        }
+
+        @Override
+        public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+            Log.e(TAG, "Error code: " + errorCode);
+        }
+    };
+
+
+
+    /*public File getFile(){
         return outputFile;
-    }
+    }*/
 }

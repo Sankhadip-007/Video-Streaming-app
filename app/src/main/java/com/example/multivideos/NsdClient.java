@@ -26,11 +26,14 @@ public class NsdClient extends AppCompatActivity {
     private NsdManager.DiscoveryListener discoveryListener;
     private NsdManager.ResolveListener resolveListener;
     private Socket socket;
-    String fileName;
+    private String fileName;
+    private InputStream inputStream;
+    private OutputStream outputStream;
+    private byte[] buffer = new byte[1024 * 1024]; // 1MB buffer size
 
-    public NsdClient(Context context,String fileName) {
+    public NsdClient(Context context) {
         nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
-        this.fileName=fileName;
+        //this.fileName = fileName;
     }
 
     public void discoverServices() {
@@ -50,6 +53,7 @@ public class NsdClient extends AppCompatActivity {
             public void onServiceFound(NsdServiceInfo serviceInfo) {
                 Log.d(TAG, "Service found: " + serviceInfo.getServiceName());
                 //nsdManager.resolveService(serviceInfo, resolveListener);
+                resolveService(serviceInfo);
             }
 
             @Override
@@ -75,12 +79,7 @@ public class NsdClient extends AppCompatActivity {
         nsdManager.stopServiceDiscovery(discoveryListener);
     }
 
-    public void resolveService() {
-        NsdServiceInfo serviceInfo = new NsdServiceInfo();
-        serviceInfo.setServiceName("multivideos");
-        serviceInfo.setServiceType("_http._tcp.");
-        serviceInfo.setPort(8888);
-
+    public void resolveService(NsdServiceInfo serviceInfo) {
         resolveListener = new NsdManager.ResolveListener() {
             @Override
             public void onResolveFailed(NsdServiceInfo serviceInfo, int errorCode) {
@@ -98,13 +97,8 @@ public class NsdClient extends AppCompatActivity {
                     socket = new Socket(host, port);
 
                     // send the video file
-                    OutputStream outputStream = socket.getOutputStream();
-                    InputStream inputStream = null;
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        inputStream = Files.newInputStream(new File(getnewPath()).toPath());
-                    }
-
-                    byte[] buffer = new byte[1024];
+                    outputStream = socket.getOutputStream();
+                    inputStream = new FileInputStream(new File(getnewPath()));
                     int bytesRead;
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
                         outputStream.write(buffer, 0, bytesRead);
@@ -114,6 +108,8 @@ public class NsdClient extends AppCompatActivity {
                     inputStream.close();
                 } catch (IOException e) {
                     Log.e(TAG, "Error: " + e.getMessage());
+                } finally {
+                    close();
                 }
             }
         };
@@ -126,10 +122,21 @@ public class NsdClient extends AppCompatActivity {
             try {
                 socket.close();
             } catch (IOException e) {
-                Log.e(TAG, "Error: " + e.getMessage());
+                Log.e(TAG, "Error closing socket: " + e.getMessage());
             }
         }
+        if (resolveListener != null) {
+            nsdManager.stopServiceDiscovery(discoveryListener);
+            //nsdManager.unregisterService(resolveListener);
+            resolveListener = null;
+        }
+        if (discoveryListener != null) {
+            nsdManager.stopServiceDiscovery(discoveryListener);
+            discoveryListener = null;
+        }
     }
+
+
 String getPath(){
     File cacheDir = getCacheDir();
     File file = new File(cacheDir, fileName);

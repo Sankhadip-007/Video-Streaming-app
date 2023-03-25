@@ -103,7 +103,7 @@ public class Player extends AppCompatActivity {
     BroadcastReceiver mReceiver;
     Context context = this;
     NsdServer nsdServer;
-
+    NsdClient nsdClient;
     long starttime = 0L, timemilli = 0L, timeswap = 0L, updatetime = 0L, min, secs, milliseconds;
     Runnable updateTimeThread = new Runnable() {
         @Override
@@ -216,24 +216,33 @@ public class Player extends AppCompatActivity {
 
 
         } else {
-            System.out.println("Inside else");
-            // Create a new instance of NsdServer and start the service
-            nsdServer = new NsdServer(this, videoName);
-            nsdServer.registerService(8888);
-            nsdServer.acceptConnections();
             String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
             File receivedFile = new File(path);
             boolean exists = receivedFile.exists();
-            exoPlayer = new ExoPlayer.Builder(context).build();
-            playerView.setPlayer(exoPlayer);
-            if (exists) {
-                DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
-                MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
-                exoPlayer.setMediaSource(mediaSource);
-                exoPlayer.prepare();
-                //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
-            } else {
+            if(!exists) {
+                System.out.println("Inside else");
+                // Create a new instance of NsdServer and start the service
+                nsdServer = new NsdServer(this, "exoplayer,mp4");
+                nsdServer.registerService(8888);
+                nsdServer.acceptConnections();
+
+                exoPlayer = new ExoPlayer.Builder(context).build();
+                playerView.setPlayer(exoPlayer);
+                if (exists) {
+                    DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
+                    MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                            .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
+                    exoPlayer.setMediaSource(mediaSource);
+                    exoPlayer.prepare();
+                    //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
+                } else {
+                    MediaItem mediaItem = MediaItem.fromUri(videoUrl);
+                    exoPlayer.setMediaItem(mediaItem);
+                    exoPlayer.prepare();
+                    Toast.makeText(getApplicationContext(), "Playing from server", Toast.LENGTH_SHORT).show();
+                }
+            }
+            else {
                 MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                 exoPlayer.setMediaItem(mediaItem);
                 exoPlayer.prepare();
@@ -259,9 +268,8 @@ public class Player extends AppCompatActivity {
             }
         }*/
 
-        NsdClient nsdClient = new NsdClient(this, videoName);
-        nsdClient.discoverServices();
-        nsdClient.resolveService();
+        nsdClient = new NsdClient(this);
+
 
         cache = isVideoCached(videoUrl);
         System.out.println("cache after= " + cache);
@@ -429,7 +437,7 @@ public class Player extends AppCompatActivity {
         filter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
         filter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
         filter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
-        registerReceiver(mReceiver, filter);
+        //registerReceiver(mReceiver, filter);
         exoPlayer.setPlayWhenReady(true);
     }
 
@@ -439,13 +447,15 @@ public class Player extends AppCompatActivity {
         exoPlayer.release();
         // Stop the service when the activity is destroyed
         nsdServer.close();
+        nsdClient.stopDiscovery();
+        nsdClient.close();
     }
-/*    @Override
-    public  void onBackPresses()
-    {
-        super.onBackPressed();
-        setPlayPause(false);
-        release();
-        finish();
-    }*/
+    @Override
+    protected void onStart() {
+        super.onStart();
+        // Start discovering services
+        nsdClient.discoverServices();
+    }
+
+
 }
