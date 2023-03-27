@@ -222,10 +222,11 @@ public class Player extends AppCompatActivity {
             if(!exists) {
                 System.out.println("Inside else");
                 // Create a new instance of NsdServer and start the service
-                nsdServer = new NsdServer(this, "exoplayer,mp4");
+                nsdServer = new NsdServer(this, "exoplayer.mp4");
                 nsdServer.registerService(8888);
                 nsdServer.acceptConnections();
-
+               File check=new File(path);
+               exists=check.exists();
                 exoPlayer = new ExoPlayer.Builder(context).build();
                 playerView.setPlayer(exoPlayer);
                 if (exists) {
@@ -235,6 +236,7 @@ public class Player extends AppCompatActivity {
                     exoPlayer.setMediaSource(mediaSource);
                     exoPlayer.prepare();
                     //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
+                    //nsdClient = new NsdClient(this);
                 } else {
                     MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                     exoPlayer.setMediaItem(mediaItem);
@@ -243,10 +245,12 @@ public class Player extends AppCompatActivity {
                 }
             }
             else {
-                MediaItem mediaItem = MediaItem.fromUri(videoUrl);
-                exoPlayer.setMediaItem(mediaItem);
+                DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
+                MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                        .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
+                exoPlayer.setMediaSource(mediaSource);
                 exoPlayer.prepare();
-                Toast.makeText(getApplicationContext(), "Playing from server", Toast.LENGTH_SHORT).show();
+                nsdClient = new NsdClient(this);
             }
             exoPlayer.play();
         }
@@ -268,7 +272,7 @@ public class Player extends AppCompatActivity {
             }
         }*/
 
-        nsdClient = new NsdClient(this);
+
 
 
         cache = isVideoCached(videoUrl);
