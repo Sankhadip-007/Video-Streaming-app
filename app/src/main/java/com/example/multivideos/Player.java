@@ -235,8 +235,6 @@ public class Player extends AppCompatActivity {
                             .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
                     exoPlayer.setMediaSource(mediaSource);
                     exoPlayer.prepare();
-                    //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
-                    //nsdClient = new NsdClient(this);
                 } else {
                     MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                     exoPlayer.setMediaItem(mediaItem);
@@ -251,6 +249,7 @@ public class Player extends AppCompatActivity {
                 exoPlayer.setMediaSource(mediaSource);
                 exoPlayer.prepare();
                 nsdClient = new NsdClient(this);
+                nsdClient.discoverServices();
             }
             exoPlayer.play();
         }
@@ -458,7 +457,7 @@ public class Player extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         // Start discovering services
-        nsdClient.discoverServices();
+        //nsdClient.discoverServices();
     }
 
 
