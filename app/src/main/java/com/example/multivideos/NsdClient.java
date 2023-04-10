@@ -8,6 +8,7 @@ import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -18,6 +19,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class NsdClient extends AppCompatActivity {
     private static final String SERVICE_TYPE = "_http._tcp.";
@@ -98,14 +101,17 @@ public class NsdClient extends AppCompatActivity {
 
                     // send the video file
                     outputStream = socket.getOutputStream();
-                    inputStream = new FileInputStream(new File(getnewPath()));
+                    File f = new File(getnewPath());
+                    //inputStream = new FileInputStream(new File(getnewPath()));
+                    inputStream = new BufferedInputStream(new FileInputStream(f));
                     int bytesRead;
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
                         outputStream.write(buffer, 0, bytesRead);
+                        outputStream.flush();
                     }
-
                     outputStream.close();
                     inputStream.close();
+                    socket.close();
                 } catch (IOException e) {
                     Log.e(TAG, "Error: " + e.getMessage());
                 } finally {
@@ -137,11 +143,11 @@ public class NsdClient extends AppCompatActivity {
     }
 
 
-String getPath(){
-    File cacheDir = getCacheDir();
-    File file = new File(cacheDir, fileName);
-    return file.getAbsolutePath();
-}
+    String getPath(){
+        File cacheDir = getCacheDir();
+        File file = new File(cacheDir, fileName);
+        return file.getAbsolutePath();
+    }
     String getnewPath(){
         String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
         return path;

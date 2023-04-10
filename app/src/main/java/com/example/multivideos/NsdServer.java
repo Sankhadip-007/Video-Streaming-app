@@ -8,6 +8,8 @@ import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -15,6 +17,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class NsdServer extends AppCompatActivity {
     private static final String SERVICE_TYPE = "_http._tcp.";
@@ -36,8 +40,6 @@ public class NsdServer extends AppCompatActivity {
     public void registerService(int port) {
         try {
             serverSocket = new ServerSocket(port);
-
-            // advertise the service
             nsdServiceInfo = new NsdServiceInfo();
             nsdServiceInfo.setServiceType(SERVICE_TYPE);
             nsdServiceInfo.setServiceName(SERVICE_NAME);
@@ -48,7 +50,6 @@ public class NsdServer extends AppCompatActivity {
                 public void onServiceRegistered(NsdServiceInfo serviceInfo) {
                     Log.d(TAG, "Service registered: " + serviceInfo.getServiceName());
                 }
-
                 @Override
                 public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
                     Log.e(TAG, "Error code: " + errorCode);
@@ -58,7 +59,6 @@ public class NsdServer extends AppCompatActivity {
                 public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
                     Log.d(TAG, "Service unregistered: " + serviceInfo.getServiceName());
                 }
-
                 @Override
                 public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
                     Log.e(TAG, "Error code: " + errorCode);
@@ -70,36 +70,36 @@ public class NsdServer extends AppCompatActivity {
     }
 
     public void acceptConnections() {
-        final int[] flag = {0};
-        new Thread(new Runnable() {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        executorService.execute(new Runnable() {
             @Override
             public void run() {
+                if (clientSocket == null) {
+                    Log.d(TAG, "Client disconnectedd");
+                }
                 try {
                     Log.d(TAG, "Waiting for incoming connections...");
                     clientSocket = serverSocket.accept();
                     Log.d(TAG, "Client connected: " + clientSocket.getInetAddress().getHostAddress());
                     InputStream inputStream = clientSocket.getInputStream();
-
-                    // Set the output file path
                     File outputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), videoName);
                     OutputStream outputStream = new FileOutputStream(outputFile);
-
-                    byte[] buffer = new byte[1024];
-                    int bytesRead;
-
+                    byte[] buffer = new byte[1024 * 1024];
+                    int bytesRead, count=0;
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        Log.d(TAG, "Bytes read = "+(++count));
                         outputStream.write(buffer, 0, bytesRead);
                     }
-
                     inputStream.close();
                     outputStream.close();
                     clientSocket.close();
+                    serverSocket.close();
                     Log.d(TAG, "Video received: " + outputFile.getAbsolutePath());
                 } catch (IOException e) {
                     Log.e(TAG, "Error: " + e.getMessage());
                 }
             }
-        }).start();
+        });
     }
 
     public void close() {

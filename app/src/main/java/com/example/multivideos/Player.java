@@ -225,8 +225,8 @@ public class Player extends AppCompatActivity {
                 nsdServer = new NsdServer(this, "exoplayer.mp4");
                 nsdServer.registerService(8888);
                 nsdServer.acceptConnections();
-               File check=new File(path);
-               exists=check.exists();
+                File check=new File(path);
+                exists=check.exists();
                 exoPlayer = new ExoPlayer.Builder(context).build();
                 playerView.setPlayer(exoPlayer);
                 if (exists) {
@@ -235,6 +235,8 @@ public class Player extends AppCompatActivity {
                             .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
                     exoPlayer.setMediaSource(mediaSource);
                     exoPlayer.prepare();
+                    //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
+                    //nsdClient = new NsdClient(this);
                 } else {
                     MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                     exoPlayer.setMediaItem(mediaItem);
@@ -249,7 +251,6 @@ public class Player extends AppCompatActivity {
                 exoPlayer.setMediaSource(mediaSource);
                 exoPlayer.prepare();
                 nsdClient = new NsdClient(this);
-                nsdClient.discoverServices();
             }
             exoPlayer.play();
         }
@@ -406,7 +407,7 @@ public class Player extends AppCompatActivity {
         String date1 = String.valueOf(currentTime);
         String temp = vname + "       " + date1 + "      " + min + ":" + secs + ":" + milliseconds + "  " + cache;
 
-        String URL = "http://192.168.0.193:4001/video";
+        String URL = "http://192.168.0.118:4000/video";
         RequestQueue requestQueue = Volley.newRequestQueue(this);
         JSONObject json1 = new JSONObject();
         json1.put("tejas", temp);
@@ -449,15 +450,15 @@ public class Player extends AppCompatActivity {
         super.onDestroy();
         exoPlayer.release();
         // Stop the service when the activity is destroyed
-        nsdServer.close();
+        //nsdServer.close();
         nsdClient.stopDiscovery();
-        nsdClient.close();
+       //nsdClient.close();
     }
     @Override
     protected void onStart() {
         super.onStart();
         // Start discovering services
-        //nsdClient.discoverServices();
+        nsdClient.discoverServices();
     }
 
 
