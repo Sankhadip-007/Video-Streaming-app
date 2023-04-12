@@ -8,35 +8,28 @@ import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import java.nio.file.Files;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class NsdClient extends AppCompatActivity {
+public class server extends AppCompatActivity {
     private static final String SERVICE_TYPE = "_http._tcp.";
     private static final String TAG = "NsdClient";
     private NsdManager nsdManager;
     private NsdManager.DiscoveryListener discoveryListener;
     private NsdManager.ResolveListener resolveListener;
     private Socket socket;
-    private String fileName;
-    private InputStream inputStream;
-    private OutputStream outputStream;
-    private byte[] buffer = new byte[1024 * 1024]; // 1MB buffer size
+    private String videoName;
 
-    public NsdClient(Context context) {
+    public server(Context context,String videoName) {
         nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
-        //this.fileName = fileName;
+        this.videoName=videoName;
     }
 
     public void discoverServices() {
@@ -91,32 +84,8 @@ public class NsdClient extends AppCompatActivity {
 
             @Override
             public void onServiceResolved(NsdServiceInfo serviceInfo) {
-                Log.d(TAG, "Service resolved: " + serviceInfo.getServiceName());
-                try {
-                    InetAddress host = InetAddress.getByName(serviceInfo.getHost().getHostAddress());
-                    int port = serviceInfo.getPort();
-
-                    // connect to the server
-                    socket = new Socket(host, port);
-
-                    // send the video file
-                    outputStream = socket.getOutputStream();
-                    File f = new File(getnewPath());
-                    //inputStream = new FileInputStream(new File(getnewPath()));
-                    inputStream = new BufferedInputStream(new FileInputStream(f));
-                    int bytesRead;
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        outputStream.write(buffer, 0, bytesRead);
-                        outputStream.flush();
-                    }
-                    outputStream.close();
-                    inputStream.close();
-                    socket.close();
-                } catch (IOException e) {
-                    Log.e(TAG, "Error: " + e.getMessage());
-                } finally {
-                    close();
-                }
+                stopDiscovery();
+                saveVideo(serviceInfo);
             }
         };
 
@@ -142,14 +111,40 @@ public class NsdClient extends AppCompatActivity {
         }
     }
 
+    public void saveVideo(NsdServiceInfo serviceInfo) {
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        executorService.execute(new Runnable() {
+            @Override
+            public void run() {
+                if (socket == null) {
+                    Log.d(TAG, "Client disconnectedd");
+                }
+                try {
+                    Log.d(TAG, "Waiting for incoming connections...");
+                    InetAddress host = InetAddress.getByName(serviceInfo.getHost().getHostAddress());
+                    int port = serviceInfo.getPort();
 
-    String getPath(){
-        File cacheDir = getCacheDir();
-        File file = new File(cacheDir, fileName);
-        return file.getAbsolutePath();
+                    // connect to the server
+                    socket = new Socket(host, port);
+                    // receive the video
+                    InputStream inputStream = socket.getInputStream();
+                    File outputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), videoName);
+                    OutputStream outputStream = new FileOutputStream(outputFile);
+                    byte[] buffer = new byte[1024 * 1024];
+                    int bytesRead, count=0;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        Log.d(TAG, "Bytes read = "+(++count));
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+                    inputStream.close();
+                    outputStream.close();
+                    socket.close();
+                    Log.d(TAG, "Video received: " + outputFile.getAbsolutePath());
+                } catch (IOException e) {
+                    Log.e(TAG, "Error: " + e.getMessage());
+                }
+            }
+        });
     }
-    String getnewPath(){
-        String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
-        return path;
-    }
+
 }

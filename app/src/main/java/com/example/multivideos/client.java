@@ -9,32 +9,34 @@ import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-public class NsdServer extends AppCompatActivity {
+public class client extends AppCompatActivity {
     private static final String SERVICE_TYPE = "_http._tcp.";
     private static final String SERVICE_NAME = "multivideos";
     private static final String TAG = "NsdServer";
-
+    private InputStream inputStream;
+    private OutputStream outputStream;
     private NsdManager nsdManager;
     private NsdServiceInfo nsdServiceInfo;
     private ServerSocket serverSocket;
     private Socket clientSocket;
+    private byte[] buffer = new byte[1024 * 1024];
 
-    private String videoName;
 
-    public NsdServer(Context context, String videoName) {
+    public client(Context context) {
         nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
-        this.videoName = videoName;
+
     }
 
     public void registerService(int port) {
@@ -49,6 +51,7 @@ public class NsdServer extends AppCompatActivity {
                 @Override
                 public void onServiceRegistered(NsdServiceInfo serviceInfo) {
                     Log.d(TAG, "Service registered: " + serviceInfo.getServiceName());
+                    acceptConnection();
                 }
                 @Override
                 public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
@@ -69,38 +72,39 @@ public class NsdServer extends AppCompatActivity {
         }
     }
 
-    public void acceptConnections() {
-        ExecutorService executorService = Executors.newSingleThreadExecutor();
-        executorService.execute(new Runnable() {
-            @Override
-            public void run() {
-                if (clientSocket == null) {
-                    Log.d(TAG, "Client disconnectedd");
-                }
-                try {
-                    Log.d(TAG, "Waiting for incoming connections...");
-                    clientSocket = serverSocket.accept();
-                    Log.d(TAG, "Client connected: " + clientSocket.getInetAddress().getHostAddress());
-                    InputStream inputStream = clientSocket.getInputStream();
-                    File outputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), videoName);
-                    OutputStream outputStream = new FileOutputStream(outputFile);
-                    byte[] buffer = new byte[1024 * 1024];
-                    int bytesRead, count=0;
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        Log.d(TAG, "Bytes read = "+(++count));
-                        outputStream.write(buffer, 0, bytesRead);
-                    }
-                    inputStream.close();
-                    outputStream.close();
-                    clientSocket.close();
-                    serverSocket.close();
-                    Log.d(TAG, "Video received: " + outputFile.getAbsolutePath());
-                } catch (IOException e) {
-                    Log.e(TAG, "Error: " + e.getMessage());
-                }
+   void  acceptConnection(){
+    ExecutorService executorService = Executors.newSingleThreadExecutor();
+    executorService.execute(new Runnable() {
+        @Override
+        public void run() {
+            if (clientSocket == null) {
+                Log.d(TAG, "Client disconnectedd");
             }
-        });
-    }
+            try {
+
+                Log.d(TAG, "Waiting for incoming connections...");
+                clientSocket = serverSocket.accept();
+                // send the video file
+                outputStream = clientSocket.getOutputStream();
+                File f = new File(getnewPath());
+                //inputStream = new FileInputStream(new File(getnewPath()));
+                inputStream = new BufferedInputStream(new FileInputStream(f));
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                    outputStream.flush();
+                }
+                outputStream.close();
+                inputStream.close();
+                clientSocket.close();
+            } catch (IOException e) {
+                Log.e(TAG, "Error: " + e.getMessage());
+            } finally {
+                close();
+            }
+        }
+    });
+}
 
     public void close() {
         if (serverSocket != null) {
@@ -147,7 +151,8 @@ public class NsdServer extends AppCompatActivity {
 
 
 
-    /*public File getFile(){
-        return outputFile;
-    }*/
+    String getnewPath(){
+        String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
+        return path;
+    }
 }

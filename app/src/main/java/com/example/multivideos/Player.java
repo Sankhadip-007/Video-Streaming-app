@@ -1,26 +1,13 @@
 package com.example.multivideos;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.PackageManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
-import android.net.nsd.NsdManager;
-import android.net.nsd.NsdServiceInfo;
-import android.net.wifi.ScanResult;
-import android.net.wifi.WifiManager;
-import android.net.wifi.p2p.WifiP2pConfig;
-import android.net.wifi.p2p.WifiP2pDevice;
-import android.net.wifi.p2p.WifiP2pDeviceList;
-import android.net.wifi.p2p.WifiP2pInfo;
 import android.net.wifi.p2p.WifiP2pManager;
-import android.net.wifi.p2p.nsd.WifiP2pServiceInfo;
-import android.net.wifi.p2p.nsd.WifiP2pServiceRequest;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -28,10 +15,7 @@ import android.os.SystemClock;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.ListView;
 import android.widget.ProgressBar;
-import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,21 +35,17 @@ import com.google.android.exoplayer2.ui.StyledPlayerView;
 import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.DefaultDataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.FileDataSource;
-import com.google.android.exoplayer2.upstream.cache.Cache;
 import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
 import com.google.android.exoplayer2.upstream.cache.CacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.CacheKeyFactory;
 import com.google.android.exoplayer2.upstream.cache.ContentMetadata;
 import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
-import com.google.android.exoplayer2.upstream.cache.NoOpCacheEvictor;
 import com.google.android.exoplayer2.upstream.cache.SimpleCache;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.w3c.dom.ls.LSOutput;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -73,18 +53,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
 
 public class Player extends AppCompatActivity {
     public static String FILE_NAME;
@@ -100,10 +72,10 @@ public class Player extends AppCompatActivity {
     long MybufferingTime = 0;
     int set = 0;
     Uri videoUrl;
-    BroadcastReceiver mReceiver;
+    File receivedFile;
     Context context = this;
-    NsdServer nsdServer;
-    NsdClient nsdClient;
+    client nsdClient;
+    server nsdServer;
     long starttime = 0L, timemilli = 0L, timeswap = 0L, updatetime = 0L, min, secs, milliseconds;
     Runnable updateTimeThread = new Runnable() {
         @Override
@@ -217,26 +189,20 @@ public class Player extends AppCompatActivity {
 
         } else {
             String path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/exoplayer.mp4";
-            File receivedFile = new File(path);
+            receivedFile = new File(path);
             boolean exists = receivedFile.exists();
             if(!exists) {
-                System.out.println("Inside else");
                 // Create a new instance of NsdServer and start the service
-                nsdServer = new NsdServer(this, "exoplayer.mp4");
-                nsdServer.registerService(8888);
-                nsdServer.acceptConnections();
+                server server=new server(this,"exoplayer.mp4");
+                server.discoverServices();
+
                 File check=new File(path);
                 exists=check.exists();
                 exoPlayer = new ExoPlayer.Builder(context).build();
                 playerView.setPlayer(exoPlayer);
                 if (exists) {
-                    DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
-                    MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
-                            .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
-                    exoPlayer.setMediaSource(mediaSource);
-                    exoPlayer.prepare();
-                    //Toast.makeText(getApplicationContext(), "Playing from NSD", Toast.LENGTH_SHORT).show();
-                    //nsdClient = new NsdClient(this);
+                    playFromLocalStorage();
+
                 } else {
                     MediaItem mediaItem = MediaItem.fromUri(videoUrl);
                     exoPlayer.setMediaItem(mediaItem);
@@ -245,35 +211,12 @@ public class Player extends AppCompatActivity {
                 }
             }
             else {
-                DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
-                MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
-                        .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
-                exoPlayer.setMediaSource(mediaSource);
-                exoPlayer.prepare();
-                nsdClient = new NsdClient(this);
+                // video available in media folder
+                playFromLocalStorage();
+
             }
             exoPlayer.play();
         }
-
-
-/*        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        if (wifiManager != null) {
-            boolean success = wifiManager.startScan();
-            if (success) {
-                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                    return;
-                }
-                List<ScanResult> results = wifiManager.getScanResults();
-                for (ScanResult result : results) {
-                    Log.d("Wi-Fi Networks", result.SSID + " - " + result.BSSID);
-                }
-            } else {
-                Log.e("Wi-Fi Scan Error", "Could not start scan");
-            }
-        }*/
-
-
-
 
         cache = isVideoCached(videoUrl);
         System.out.println("cache after= " + cache);
@@ -313,7 +256,15 @@ public class Player extends AppCompatActivity {
         });
     }
 
-
+    void playFromLocalStorage(){
+        client client=new client(this);
+        client.registerService(8888);
+        DataSource.Factory dataSourceFactory = new FileDataSource.Factory();
+        MediaSource mediaSource = new ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(Uri.fromFile(receivedFile)));
+        exoPlayer.setMediaSource(mediaSource);
+        exoPlayer.prepare();
+    }
     private boolean isVideoCached(Uri uri) {
         CacheDataSource.Factory cdf = new CacheDataSource.Factory();
         CacheKeyFactory ckf = cdf.getCacheKeyFactory();
@@ -449,16 +400,13 @@ public class Player extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         exoPlayer.release();
-        // Stop the service when the activity is destroyed
-        //nsdServer.close();
-        nsdClient.stopDiscovery();
-       //nsdClient.close();
+
     }
     @Override
     protected void onStart() {
         super.onStart();
         // Start discovering services
-        nsdClient.discoverServices();
+
     }
 
 
