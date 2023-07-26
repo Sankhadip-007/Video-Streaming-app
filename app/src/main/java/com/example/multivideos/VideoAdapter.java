@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 
 public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.ViewHolder> implements Filterable {
-
     private List<Video> allVideos;
     List<Video> videoListAll=new ArrayList<>(); // for filtering
     private final Context context;
@@ -31,7 +30,6 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.ViewHolder> 
         this.context = ctx;
         videoListAll.addAll(allVideos);
     }
-
 
     @NonNull
     @Override
@@ -64,11 +62,10 @@ public class VideoAdapter extends RecyclerView.Adapter<VideoAdapter.ViewHolder> 
     public Filter getFilter() {
         return filter;
     }
-Filter filter =new Filter() {
+    Filter filter =new Filter() {
         // run on background
-    @Override
-    protected FilterResults performFiltering(CharSequence constraint) {
-        List<Video> filteredList=new ArrayList<>();
+        @Override
+        protected FilterResults performFiltering(CharSequence constraint) {List<Video> filteredList=new ArrayList<>();
         if(constraint.length() == 0){
             filteredList.addAll(videoListAll);
         }
@@ -83,13 +80,12 @@ Filter filter =new Filter() {
         filterResults.values=filteredList;
         return filterResults;
     }
-// run on ui
+    // run on ui
     @Override
     protected void publishResults(CharSequence constraint, FilterResults results) {
      allVideos.clear();
      allVideos.addAll((Collection<? extends Video>) results.values);
      notifyDataSetChanged();
-
     }
 };
     public class ViewHolder extends RecyclerView.ViewHolder{

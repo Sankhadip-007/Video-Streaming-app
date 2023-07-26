@@ -1,13 +1,17 @@
 package com.example.multivideos;
 
+import static android.content.ContentValues.TAG;
+import android.util.Log;
+
 import java.io.Serializable;
 
 public class Video implements Serializable{
-    private  String id;
-    private  String name;
-    private  String videoUrl;
+    private String id;
+    private String name;
+    private String videoUrl;
 
     public String getVideoUrl() {
+        //Log.d(TAG, "Video url() = "+videoUrl);
         return videoUrl;
     }
 
